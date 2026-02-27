@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grammar Galaxy Defender 7.0</title>
+    <!-- Скрипт защиты с исключением для localhost и локальных файлов -->
+    <script>
+        (function() {
+            const allowedDomains = ['stepik.org', 'welcome.stepik.org'];
+            const referrer = document.referrer;
+            const hostname = window.location.hostname;
+            
+            // Проверка на локальный запуск (localhost, 127.0.0.1 или запуск файла напрямую)
+            const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '' || window.location.protocol === 'file:';
+            const isInsideStepik = allowedDomains.some(domain => referrer.includes(domain));
+
+            if (!isInsideStepik && !isLocal) {
+                document.documentElement.innerHTML = `
+                    <div style="background:#020617; color:#fff; height:100vh; display:flex;
+                                flex-direction:column; align-items:center; justify-content:center;
+                                font-family:sans-serif; text-align:center; padding:20px; margin:0;">
+                        <h1 style="color:#ef4444; font-size: 2.5rem; margin-bottom: 20px;">⛔️ Доступ ограничен</h1>
+                        <p style="font-size: 1.2rem; margin-bottom: 30px;">Эта игра — часть курса. <br>
+                        Пожалуйста, вернитесь к обучению на Stepik.</p>
+                        <a href="https://stepik.org" style="color:#000; background:#4ade80; padding: 15px 30px; text-decoration:none; border-radius:30px; font-weight:bold; font-size:1.1rem;">Перейти к курсу</a>
+                    </div>`;
+                window.stop();
+            }
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@400;700;900&family=Russo+One&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #020617; /* Very dark slate */
+            font-family: 'Roboto', sans-serif;
+            touch-action: none;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* --- NEW MENU & MODAL DESIGN --- */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: rgba(2, 6, 23, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 10; color: white; text-align: center;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+
+        .modal-box {
+            background: linear-gradient(145deg, #1e293b, #0f172a);
+            border: 2px solid #8b5cf6;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 0 40px rgba(139, 92, 246, 0.4);
+            z-index: 60;
+        }
+
+        /* Custom Scrollbar for modals */
+        .modal-box::-webkit-scrollbar { width: 8px; }
+        .modal-box::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .modal-box::-webkit-scrollbar-thumb { background: #8b5cf6; border-radius: 10px; }
+
+        .hidden { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+
+        h1 {
+            font-family: 'Russo One', sans-serif; font-size: 3rem; text-transform: uppercase;
+            letter-spacing: 2px; background: linear-gradient(to right, #c084fc, #e879f9);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(192, 132, 252, 0.5); margin-bottom: 0.5rem;
+            margin-top: -12vh; /* Увеличили отрицательный отступ, чтобы поднять заголовок выше */
+        }
+        @media (min-width: 768px) { h1 { font-size: 5rem; } }
+
+        h2 { font-family: 'Orbitron', sans-serif; font-size: 1.2rem; color: #94a3b8; margin-bottom: 3rem; letter-spacing: 1px; } /* Увеличили отступ снизу */
+
+        .menu-panel { display: grid; grid-template-columns: 1fr; gap: 20px; width: 90%; max-width: 1000px; }
+        @media (min-width: 768px) { .menu-panel { grid-template-columns: repeat(3, 1fr); } }
+
+        .mission-card {
+            background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 16px; padding: 20px; transition: all 0.3s ease;
+            position: relative; overflow: hidden; display: flex; flex-direction: column;
+            align-items: center; justify-content: space-between; min-height: 180px;
+        }
+        
+        /* Блокировка уровней */
+        .mission-card.locked { opacity: 0.6; filter: grayscale(0.8); cursor: not-allowed; }
+        .mission-card.locked:hover { transform: none; border-color: rgba(148, 163, 184, 0.2); background: rgba(30, 41, 59, 0.6); box-shadow: none; }
+        .mission-card.unlocked { cursor: pointer; }
+        .mission-card.unlocked:hover {
+            transform: translateY(-5px); border-color: #a855f7; background: rgba(30, 41, 59, 0.9);
+            box-shadow: 0 10px 30px rgba(168, 85, 247, 0.2);
+        }
+
+        .mission-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px;
+            background: linear-gradient(90deg, #7c3aed, #db2777); opacity: 0; transition: opacity 0.3s;
+        }
+        .mission-card.unlocked:hover::before { opacity: 1; }
+
+        .mission-title { font-family: 'Orbitron', sans-serif; font-size: 1.2rem; font-weight: bold; color: #e2e8f0; margin-bottom: 10px; }
+        .mission-desc { font-size: 0.9rem; color: #94a3b8; margin-bottom: 15px; }
+        .mission-score { font-size: 0.8rem; font-weight: bold; color: #4ade80; background: rgba(74, 222, 128, 0.1); padding: 4px 8px; border-radius: 4px; opacity: 0; }
+        .played .mission-score { opacity: 1; }
+        .play-icon { font-size: 2rem; margin-bottom: 10px; }
+        .lock-icon { position: absolute; top: 10px; right: 10px; font-size: 1.5rem; }
+
+        .btn-small {
+            background: rgba(15, 23, 42, 0.8); border: 1px solid #475569; color: #cbd5e1;
+            padding: 10px 20px; border-radius: 8px; cursor: pointer; font-family: 'Orbitron', sans-serif; transition: all 0.2s;
+        }
+        .btn-small:hover { border-color: #a855f7; color: white; background: rgba(30, 41, 59, 0.9); }
+        
+        .btn-theory {
+            background: linear-gradient(45deg, #3b82f6, #8b5cf6); border: none; color: white;
+            padding: 15px 30px; border-radius: 12px; cursor: pointer; font-family: 'Russo One', sans-serif; font-size: 1.2rem;
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.5); transition: transform 0.2s; margin-bottom: 20px;
+        }
+        .btn-theory:hover { transform: scale(1.05); }
+
+        .btn-grand {
+            background: linear-gradient(45deg, #f59e0b, #d97706); color: black; font-weight: bold;
+            border: none; padding: 15px 40px; border-radius: 50px; font-family: 'Russo One', sans-serif; font-size: 1.2rem;
+            cursor: pointer; box-shadow: 0 0 20px rgba(245, 158, 11, 0.4); animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
+            70% { box-shadow: 0 0 0 15px rgba(245, 158, 11, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+
+        /* Top Controls */
+        #top-controls { position: absolute; top: 20px; right: 20px; z-index: 40; display: flex; gap: 15px; }
+        .control-panel { display: flex; align-items: center; background: rgba(0, 0, 0, 0.6); padding: 8px 15px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.2); }
+        #volume-slider { width: 80px; margin-left: 10px; cursor: pointer; }
+        .fs-btn { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; padding: 0 5px; transition: color 0.2s; }
+        .fs-btn:hover { color: #a855f7; }
+
+        /* HUD */
+        .hud { position: absolute; top: 20px; left: 20px; color: white; font-family: 'Orbitron', sans-serif; font-size: 1.2rem; z-index: 20; pointer-events: none; text-shadow: 2px 2px 4px black; }
+        .question-box { position: absolute; z-index: 20; background: rgba(15, 23, 42, 0.9); border: 2px solid #a855f7; padding: 15px 30px; border-radius: 15px; color: white; font-size: 1.2rem; font-weight: bold; width: 90%; max-width: 800px; text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.8); transition: all 0.3s ease; }
+        .pos-top { bottom: auto; top: 20px; margin-top: 50px; }
+        .pos-mid { bottom: auto; top: 50%; transform: translateY(-50%); opacity: 0.6; }
+        .pos-mid:hover { opacity: 1; }
+        @media (min-width: 768px) { .question-box { font-size: 1.8rem; padding: 20px 40px; } .pos-top { margin-top: 10px; } }
+        .highlight { color: #f472b6; text-decoration: underline; padding: 0 5px; }
+        .translation-text { display: block; margin-top: 10px; font-size: 1rem; color: #fbbf24; font-weight: normal; font-style: italic; }
+
+        /* Hints */
+        #hints-container { position: absolute; bottom: 20px; right: 20px; display: flex; gap: 10px; z-index: 30; }
+        .hint-btn { background: rgba(30, 41, 59, 0.8); border: 2px solid #3b82f6; color: white; padding: 10px 15px; border-radius: 10px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px; }
+        .hint-btn:disabled { border-color: #475569; color: #94a3b8; cursor: not-allowed; }
+
+        /* Grade Badges */
+        .grade-badge { font-weight: bold; padding: 2px 10px; border-radius: 5px; }
+        .grade-5 { background: #22c55e; color: black; }
+        .grade-4 { background: #eab308; color: black; }
+        .grade-3 { background: #f97316; color: black; }
+        .grade-2 { background: #ef4444; color: white; }
+        .score-display { font-size: 3rem; font-weight: bold; margin: 20px 0; background: linear-gradient(to right, #c084fc, #db2777); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        /* Explanations & Theory Formatting */
+        .theory-section { text-align: left; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin-bottom: 15px; border-left: 4px solid #8b5cf6;}
+        .word-order-box { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 15px 0; font-size: 1.1rem;}
+        .wo-item { background: #1e293b; padding: 8px 12px; border-radius: 8px; border: 1px solid; }
+        
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="top-controls">
+            <div class="control-panel">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5">
+            </div>
+            <div class="control-panel">
+                <button class="fs-btn" onclick="toggleFullScreen()" title="Во весь экран">⛶</button>
+            </div>
+        </div>
+
+        <!-- MAIN MENU -->
+        <div id="main-menu" class="overlay">
+            <h1>Present Simple</h1>
+            <h2>Grammar Galaxy</h2>
+
+            <button class="btn-theory animate-bounce" onclick="openTheory()">📖 Изучить Теорию</button>
+            
+            <div id="total-progress" class="mb-4 text-purple-300 font-mono text-sm hidden">
+                Миссия выполнена на: <span id="progress-percent">0%</span>
+            </div>
+
+            <div class="menu-panel">
+                <!-- Level 1 Card -->
+                <div class="mission-card locked" id="card-1" onclick="startIfUnlocked(1)">
+                    <div class="lock-icon" id="lock-1">🔒</div>
+                    <div class="play-icon">🚀</div>
+                    <div class="mission-title">Level 1: Affirmative</div>
+                    <div class="mission-desc">Лови правильные глаголы.<br>Доступна "Заморозка".</div>
+                    <div class="mission-score" id="score-l1">Score: -/-</div>
+                </div>
+
+                <!-- Level 2 Card -->
+                <div class="mission-card locked" id="card-2" onclick="startIfUnlocked(2)">
+                    <div class="lock-icon" id="lock-2">🔒</div>
+                    <div class="play-icon">🛸</div>
+                    <div class="mission-title">Level 2: Negative</div>
+                    <div class="mission-desc">Космический тир.<br>Стреляй в астероиды.</div>
+                    <div class="mission-score" id="score-l2">Score: -/-</div>
+                </div>
+
+                <!-- Level 3 Card -->
+                <div class="mission-card locked" id="card-3" onclick="startIfUnlocked(3)">
+                    <div class="lock-icon" id="lock-3">🔒</div>
+                    <div class="play-icon">👽</div>
+                    <div class="mission-title">Level 3: Questions</div>
+                    <div class="mission-desc">Магнитный луч.<br>Похищай ответы!</div>
+                    <div class="mission-score" id="score-l3">Score: -/-</div>
+                </div>
+            </div>
+
+            <div class="mt-8 flex gap-4 flex-wrap justify-center">
+                <button class="btn-small" onclick="toggleGradingCriteria(true)">📊 Критерии Оценки</button>
+                <button id="btn-final-report" class="btn-grand hidden" onclick="showFinalReport()">🏆 ФИНАЛ МИССИИ</button>
+            </div>
+        </div>
+
+        <!-- THEORY MODAL -->
+        <div id="theory-overlay" class="overlay hidden" style="z-index: 70;">
+            <div class="modal-box w-full max-w-4xl">
+                <h2 class="text-3xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500 text-center" style="font-family:'Russo One'">📚 Космическая Грамматика: Present Simple</h2>
+                
+                <p class="text-gray-300 text-lg mb-6 text-center">
+                    Используется для <b>регулярных действий</b>, привычек и фактов. <br>
+                    <i>Слова-маркеры: always (всегда), usually (обычно), often (часто), every day (каждый день).</i>
+                </p>
+
+                <div class="theory-section border-blue-500">
+                    <h3 class="text-xl font-bold text-blue-400 mb-2">🧩 Порядок слов (Word Order)</h3>
+                    <p class="text-sm text-gray-300 mb-2">В английском предложении строгий порядок. Как вагончики поезда, слова стоят на своих местах:</p>
+                    <div class="word-order-box">
+                        <div class="wo-item border-green-400"><span class="text-green-400 font-bold">1. Кто? / Что?</span><br>(Подлежащее: I, He, The cat)</div>
+                        <div class="wo-item border-yellow-400"><span class="text-yellow-400 font-bold">2. Что делает?</span><br>(Сказуемое: play, likes)</div>
+                        <div class="wo-item border-pink-400"><span class="text-pink-400 font-bold">3. Что / Где / Когда?</span><br>(Остальное: tennis every day)</div>
+                    </div>
+                    <p class="text-center font-bold text-white bg-blue-900/50 py-2 rounded">I <span class="text-green-400">play</span> tennis <span class="text-pink-400">every day</span>.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="theory-section border-green-500">
+                        <h3 class="text-xl font-bold text-green-400 mb-2">✅ Утверждение (+)</h3>
+                        <p class="mb-1"><b class="text-white">I, You, We, They</b> 👉 Глагол без изменений.</p>
+                        <ul class="text-gray-300 text-sm list-disc pl-5 mb-3">
+                            <li>We <span class="text-green-300 font-bold">play</span> games.</li>
+                        </ul>
+                        <p class="mb-1"><b class="text-yellow-300">He, She, It</b> 👉 К глаголу добавляем <b>-s / -es</b>.</p>
+                        <ul class="text-gray-300 text-sm list-disc pl-5">
+                            <li>He <span class="text-yellow-300 font-bold">likes</span> apples.</li>
+                            <li>She <span class="text-yellow-300 font-bold">goes</span> to school.</li>
+                        </ul>
+                    </div>
+
+                    <div class="theory-section border-red-500">
+                        <h3 class="text-xl font-bold text-red-400 mb-2">❌ Отрицание (-)</h3>
+                        <p class="mb-1"><b class="text-white">I, You, We, They</b> 👉 <b>don't</b> + Глагол</p>
+                        <ul class="text-gray-300 text-sm list-disc pl-5 mb-3">
+                            <li>They <span class="text-red-400 font-bold">don't</span> play.</li>
+                        </ul>
+                        <p class="mb-1"><b class="text-yellow-300">He, She, It</b> 👉 <b>doesn't</b> + Глагол</p>
+                        <p class="text-xs text-yellow-100 mb-1">(Окончание -s убегает к doesn't! Глагол чистый)</p>
+                        <ul class="text-gray-300 text-sm list-disc pl-5">
+                            <li>He <span class="text-red-400 font-bold">doesn't</span> like apples.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="theory-section border-purple-500 mt-4">
+                    <h3 class="text-xl font-bold text-purple-400 mb-2">❓ Вопросы (?)</h3>
+                    <p class="text-gray-300 text-sm mb-2">Вспомогательный глагол прыгает на <b class="text-white">первое место</b> (до подлежащего)!</p>
+                    <div class="flex flex-wrap justify-between gap-4">
+                        <div class="bg-black/30 p-3 rounded w-full md:w-[48%]">
+                            <b class="text-purple-300 font-bold text-lg">Do</b> + I/you/we/they + V ?<br>
+                            <span class="text-sm text-gray-400">👉 <span class="text-purple-300 font-bold">Do</span> you like pizza?</span>
+                        </div>
+                        <div class="bg-black/30 p-3 rounded w-full md:w-[48%]">
+                            <b class="text-purple-300 font-bold text-lg">Does</b> + he/she/it + V ?<br>
+                            <span class="text-sm text-gray-400">👉 <span class="text-purple-300 font-bold">Does</span> she play tennis?</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 text-center">
+                    <button class="bg-green-500 hover:bg-green-400 text-black font-bold py-3 px-8 rounded-full text-xl transition-transform transform hover:scale-105" onclick="closeTheory()">Всё понятно! Разблокировать игру 🚀</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- EXPLANATION MODAL (ON ERROR) -->
+        <div id="explanation-modal" class="overlay hidden" style="z-index: 65; background: rgba(0,0,0,0.9);">
+            <div class="modal-box border-red-500 text-center animate-pulse" style="animation-iteration-count: 1;">
+                <h2 class="text-3xl font-bold text-red-500 mb-4">💥 Ошибка орбиты!</h2>
+                <p id="exp-wrong-text" class="text-xl text-gray-300 mb-6"></p>
+                <div class="bg-slate-800 p-4 rounded-lg mb-6 border border-slate-600">
+                    <p id="exp-theory-text" class="text-lg text-white font-medium"></p>
+                </div>
+                <button class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-full transition" onclick="closeExplanation()">Понятно, продолжить бой!</button>
+            </div>
+        </div>
+
+        <!-- LEVEL INSTRUCTION MODAL -->
+        <div id="instruction-modal" class="overlay hidden" style="z-index: 65;">
+            <div class="modal-box text-center">
+                <h2 id="inst-title" class="text-3xl font-bold text-blue-400 mb-4">ИНСТРУКЦИЯ</h2>
+                <div class="text-6xl mb-4" id="inst-icon">🚀</div>
+                <p id="inst-text" class="text-xl text-gray-200 mb-8"></p>
+                <button class="btn-grand" onclick="startActualLevel()">ПОЕХАЛИ!</button>
+            </div>
+        </div>
+
+        <!-- LEVEL COMPLETE / GAME OVER -->
+        <div id="game-over-screen" class="overlay hidden">
+            <h1 id="go-title">LEVEL COMPLETE</h1>
+            <div class="score-display" id="level-score">0 / 10</div>
+            <p class="text-gray-400 mb-6">Очки добавлены в общий зачет</p>
+            <div class="flex gap-4">
+                <button class="btn-small" onclick="returnToMenu()">В МЕНЮ</button>
+                <button id="btn-next-level" class="btn-small bg-purple-600 border-none text-white" onclick="startIfUnlocked(gameMode + 1)">СЛЕДУЮЩИЙ УРОВЕНЬ</button>
+            </div>
+        </div>
+
+        <!-- FINAL REPORT CARD -->
+        <div id="final-report-screen" class="overlay hidden" style="overflow-y: auto;">
+            <div class="py-10 flex flex-col items-center min-h-full">
+                <h1>MISSION REPORT</h1>
+                <div class="text-2xl text-gray-300 mb-2">Общий результат:</div>
+                <div class="score-display" id="total-score-display">0 / 30</div>
+                <div class="text-4xl font-bold mb-6" id="final-grade-badge">Оценка: 5</div>
+                
+                <div class="bg-slate-800 p-6 rounded-xl mb-6 w-80 text-left">
+                    <div class="flex justify-between mb-2"><span>Level 1:</span> <span id="report-l1" class="font-mono text-green-400">--</span></div>
+                    <div class="flex justify-between mb-2"><span>Level 2:</span> <span id="report-l2" class="font-mono text-green-400">--</span></div>
+                    <div class="flex justify-between mb-2"><span>Level 3:</span> <span id="report-l3" class="font-mono text-green-400">--</span></div>
+                </div>
+
+                <button class="btn-small mb-4" onclick="resetGame()">НОВАЯ ИГРА</button>
+
+                <!-- SECRET WORD SECTION -->
+                <button id="btn-secret" class="hidden btn-grand mt-4 bg-gradient-to-r from-pink-500 to-purple-500 shadow-[0_0_20px_rgba(236,72,153,0.6)]" onclick="showSecret()">🌟 Показать СЕКРЕТНОЕ СЛОВО</button>
+                <div id="secret-word-display" class="hidden text-4xl font-bold text-yellow-300 mt-6 animate-bounce" style="text-shadow: 0 0 15px rgba(253, 224, 71, 0.8); font-family: 'Russo One', sans-serif;"></div>
+            </div>
+        </div>
+
+        <!-- CRITERIA MODAL -->
+        <div id="grading-modal" class="overlay hidden" style="z-index: 80;">
+            <div class="modal-box w-full max-w-sm">
+                <h2 class="text-2xl font-bold mb-4 text-center text-purple-400">Критерии оценки</h2>
+                <div class="flex justify-between mb-3 border-b border-slate-600 pb-2"><span class="grade-badge grade-5">«5»</span> <span>100–85%</span></div>
+                <div class="flex justify-between mb-3 border-b border-slate-600 pb-2"><span class="grade-badge grade-4">«4»</span> <span>84–70%</span></div>
+                <div class="flex justify-between mb-3 border-b border-slate-600 pb-2"><span class="grade-badge grade-3">«3»</span> <span>69–50%</span></div>
+                <div class="flex justify-between mb-4"><span class="grade-badge grade-2">«2»</span> <span>Менее 50%</span></div>
+                <div class="text-center mt-6">
+                    <button class="btn-small bg-purple-600 text-white w-full" onclick="closeGradingCriteria()">Закрыть</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- HUD & GAMEPLAY -->
+        <div id="hud" class="hud hidden">
+            <div>Score: <span id="score" class="text-yellow-400 font-bold">0</span></div>
+            <div>Lives: <span id="lives">❤️❤️</span></div>
+        </div>
+
+        <div id="hints-container" class="hidden">
+            <button id="btn-freeze" class="hint-btn" onclick="activateFreeze()">❄️ Заморозка</button>
+            <button id="btn-translate" class="hint-btn" onclick="activateTranslation()">📖 Перевод</button>
+        </div>
+
+        <div id="question-display" class="question-box hidden">
+            <span id="question-text">Loading...</span>
+            <span id="translation-text" class="translation-text hidden"></span>
+        </div>
+    </div>
+
+    <script>
+        // Предотвращение скролла стрелками на клавиатуре
+        window.addEventListener('keydown', function(e) {
+            if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) {
+                e.preventDefault();
+            }
+        }, false);
+
+        // --- ASSETS ---
+        // Использование запрошенных звуков
+        const SOUNDS = {
+            wrong: new Audio('https://george-stone-pax.github.io/my-game-assets/dodgeball.mp3'),
+            right: new Audio('https://george-stone-pax.github.io/my-game-assets/rightanswer-95219.mp3'),
+            backgrounds: [
+                'https://george-stone-pax.github.io/my-game-assets/Aylex - Back To Life (freetouse.com).mp3',
+                'https://george-stone-pax.github.io/my-game-assets/Aylex - Adrenaline Drive (freetouse.com).mp3',
+                'https://george-stone-pax.github.io/my-game-assets/Aylex - Off Road (freetouse.com).mp3',
+                'https://george-stone-pax.github.io/gamesnew/My_music4.mp3',
+                'https://george-stone-pax.github.io/gamesnew/My_music7.mp3'
+            ]
+        };
+        const BALL_COLORS = ['#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'];
+
+        const POOL_L1 = [
+            { text: "My cat _____ milk.", correct: "likes", wrongs: ["like", "liking"], trans: "Моя кошка любит молоко." },
+            { text: "We _____ to school.", correct: "go", wrongs: ["goes", "going"], trans: "Мы ходим в школу." },
+            { text: "Tom _____ football.", correct: "plays", wrongs: ["play", "playing"], trans: "Том играет в футбол." },
+            { text: "I _____ ice cream.", correct: "love", wrongs: ["loves", "loving"], trans: "Я люблю мороженое." },
+            { text: "She _____ in London.", correct: "lives", wrongs: ["live", "living"], trans: "Она живет в Лондоне." },
+            { text: "Birds _____ high.", correct: "fly", wrongs: ["flies", "flying"], trans: "Птицы летают высоко." },
+            { text: "He _____ his homework.", correct: "does", wrongs: ["do", "doing"], trans: "Он делает домашнюю работу." },
+            { text: "They _____ pizza.", correct: "eat", wrongs: ["eats", "eating"], trans: "Они едят пиццу." },
+            { text: "Dad _____ hard.", correct: "works", wrongs: ["work", "working"], trans: "Папа усердно работает." },
+            { text: "You _____ English.", correct: "speak", wrongs: ["speaks", "speaking"], trans: "Ты говоришь по-английски." }
+        ];
+
+        const POOL_L2 = [
+            { text: "She _____ play tennis.", correct: "doesn't", wrongs: ["don't", "not"] },
+            { text: "He _____ like spiders.", correct: "doesn't", wrongs: ["don't", "no"] },
+            { text: "They _____ go to school.", correct: "don't", wrongs: ["doesn't", "not"] },
+            { text: "Tom _____ watch TV.", correct: "doesn't", wrongs: ["don't", "isn't"] },
+            { text: "I _____ drink coffee.", correct: "don't", wrongs: ["doesn't", "no"] },
+            { text: "It _____ rain often.", correct: "doesn't", wrongs: ["don't", "is"] },
+            { text: "We _____ live here.", correct: "don't", wrongs: ["doesn't", "aren't"] },
+            { text: "Dog _____ eat fish.", correct: "doesn't", wrongs: ["don't", "not"] },
+            { text: "You _____ know him.", correct: "don't", wrongs: ["doesn't", "isn't"] },
+            { text: "Friends _____ like it.", correct: "don't", wrongs: ["doesn't", "aren't"] }
+        ];
+
+        const POOL_L3 = [
+            { text: "_____ you like apples?", correct: "Do", wrongs: ["Does", "Is"] },
+            { text: "_____ mom cook?", correct: "Does", wrongs: ["Do", "Is"] },
+            { text: "_____ we have work?", correct: "Do", wrongs: ["Does", "Are"] },
+            { text: "_____ cat sleep?", correct: "Does", wrongs: ["Do", "Is"] },
+            { text: "_____ they live here?", correct: "Do", wrongs: ["Does", "Is"] },
+            { text: "_____ she speak?", correct: "Does", wrongs: ["Do", "Are"] },
+            { text: "_____ I need a pen?", correct: "Do", wrongs: ["Does", "Am"] },
+            { text: "_____ it snow?", correct: "Does", wrongs: ["Do", "Is"] },
+            { text: "_____ boys play?", correct: "Do", wrongs: ["Does", "Is"] },
+            { text: "_____ bus stop here?", correct: "Does", wrongs: ["Do", "Is"] }
+        ];
+
+        // --- GAME STATE ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let gameMode = 0; 
+        let gameActive = false;
+        let isPausedForExplanation = false;
+        let theoryRead = false;
+        let score = 0;
+        let lives = 2;
+        let currentQuestions = [];
+        let currentQuestionIndex = 0;
+        let particles = []; let items = []; let stars = []; let bullets = [];
+        let player = { x: 0, y: 0, width: 60, height: 60 };
+        let mouseX = 0, mouseY = 0;
+        let isBeaming = false; let isFrozen = false;
+        let currentMusic = null;
+
+        // Progress Tracking
+        let levelScores = { 1: 0, 2: 0, 3: 0 };
+        let levelMax = { 1: 10, 2: 10, 3: 10 };
+        let levelsCompleted = { 1: false, 2: false, 3: false };
+        let currentGrade = 0; // Для проверки на 5
+        let highestUnlocked = 0; // Переменная для отслеживания открытых уровней
+
+        // --- CORE FUNCTIONS ---
+        function getGameQuestions(pool) {
+            return [...pool].sort(() => 0.5 - Math.random()).slice(0, 10);
+        }
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            if (gameMode === 1) player.y = canvas.height - 120;
+            if (gameMode === 2) { if(!gameActive) player.x = canvas.width/2; player.y = canvas.height - 80; }
+            if (gameMode === 3) player.y = 100;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+        initStars();
+        requestAnimationFrame(gameLoop);
+
+        // --- FULLSCREEN ---
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable full-screen mode: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        // --- INPUT ---
+        function updatePlayerPos(x) {
+            if (gameActive && !isPausedForExplanation) player.x = x - player.width/2;
+        }
+        window.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; updatePlayerPos(e.clientX); });
+        window.addEventListener('touchmove', e => { if(gameActive){ e.preventDefault(); updatePlayerPos(e.touches[0].clientX); mouseX = e.touches[0].clientX; mouseY = e.touches[0].clientY; } }, {passive: false});
+        
+        function handleActionStart() {
+            if(!gameActive || isPausedForExplanation) return;
+            if(gameMode === 2) shootBullet();
+            if(gameMode === 3) isBeaming = true;
+        }
+        window.addEventListener('mousedown', handleActionStart);
+        window.addEventListener('touchstart', e => { handleActionStart(); mouseX = e.touches[0].clientX; mouseY = e.touches[0].clientY; updatePlayerPos(e.touches[0].clientX); });
+        
+        window.addEventListener('mouseup', () => { isBeaming = false; });
+        window.addEventListener('touchend', () => { isBeaming = false; });
+
+        // Keyboard Support
+        window.addEventListener('keydown', e => {
+            if(!gameActive || isPausedForExplanation) return;
+            const speed = 30;
+            if(e.code === "ArrowLeft") updatePlayerPos(player.x + player.width/2 - speed);
+            if(e.code === "ArrowRight") updatePlayerPos(player.x + player.width/2 + speed);
+            if(e.code === "Space") handleActionStart();
+        });
+        window.addEventListener('keyup', e => { if(e.code === "Space") isBeaming = false; });
+
+        document.getElementById('volume-slider').addEventListener('input', e => {
+            if(currentMusic) currentMusic.volume = e.target.value;
+            SOUNDS.wrong.volume = e.target.value;
+            SOUNDS.right.volume = e.target.value;
+        });
+
+        // --- LOGIC ---
+        function initStars() {
+            stars = [];
+            for(let i=0; i<150; i++) stars.push({ x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight, size: Math.random() * 2, speed: Math.random() * 0.5 + 0.1 });
+        }
+
+        function playRandomMusic() {
+            if (currentMusic) { currentMusic.pause(); currentMusic.currentTime = 0; }
+            const idx = Math.floor(Math.random() * SOUNDS.backgrounds.length);
+            currentMusic = new Audio(SOUNDS.backgrounds[idx]);
+            currentMusic.loop = true;
+            currentMusic.volume = document.getElementById('volume-slider').value;
+            currentMusic.play().catch(() => {});
+        }
+
+        function playSound(type) {
+            const s = type === 'right' ? SOUNDS.right : SOUNDS.wrong;
+            s.currentTime = 0; s.volume = document.getElementById('volume-slider').value;
+            s.play().catch(() => {});
+        }
+
+        // --- MENU / THEORY FLOW ---
+        function openTheory() {
+            document.getElementById('theory-overlay').classList.remove('hidden');
+        }
+        function closeTheory() {
+            document.getElementById('theory-overlay').classList.add('hidden');
+            if(!theoryRead) {
+                theoryRead = true;
+                highestUnlocked = 1; // Открываем только первый уровень
+                document.querySelector('.btn-theory').innerText = "📖 Повторить Теорию";
+                updateLevelLocks();
+            }
+        }
+        function updateLevelLocks() {
+            for(let i=1; i<=3; i++) {
+                const c = document.getElementById(`card-${i}`);
+                const lock = document.getElementById(`lock-${i}`);
+                if (i <= highestUnlocked) {
+                    c.classList.remove('locked'); c.classList.add('unlocked');
+                    lock.classList.add('hidden');
+                } else {
+                    c.classList.add('locked'); c.classList.remove('unlocked');
+                    lock.classList.remove('hidden');
+                }
+            }
+        }
+
+        function startIfUnlocked(mode) {
+            if(!theoryRead) {
+                alert("Сначала изучи теорию, капитан! (Нажми 'Изучить Теорию')");
+                // Можно добавить красивый визуал, но alert пока самый простой
+                const btn = document.querySelector('.btn-theory');
+                btn.style.transform = 'scale(1.1)'; setTimeout(()=>btn.style.transform='none', 300);
+                return;
+            }
+            if (mode > highestUnlocked) {
+                return; // Игнорируем клик, если уровень еще закрыт
+            }
+            showInstruction(mode);
+        }
+
+        function showInstruction(mode) {
+            gameMode = mode;
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            
+            const instModal = document.getElementById('instruction-modal');
+            const title = document.getElementById('inst-title');
+            const icon = document.getElementById('inst-icon');
+            const text = document.getElementById('inst-text');
+
+            if(mode === 1) { title.innerText = "Уровень 1: Утверждение"; icon.innerText = "🚀"; text.innerHTML = "Перемещай корабль (мышью, пальцем или стрелками).<br>Лови правильные глаголы для предложения!"; }
+            if(mode === 2) { title.innerText = "Уровень 2: Отрицание"; icon.innerText = "🛸"; text.innerHTML = "Космический тир!<br>Стреляй (клик/касание/пробел) в астероиды с правильными вспомогательными глаголами."; }
+            if(mode === 3) { title.innerText = "Уровень 3: Вопросы"; icon.innerText = "👽"; text.innerHTML = "Управляй НЛО.<br>Наведи тарелку и <b>ЗАЖМИ</b> кнопку (или пробел), чтобы похитить правильный ответ магнитным лучом."; }
+
+            instModal.classList.remove('hidden');
+        }
+
+        function startActualLevel() {
+            document.getElementById('instruction-modal').classList.add('hidden');
+            let pool = gameMode === 1 ? POOL_L1 : (gameMode === 2 ? POOL_L2 : POOL_L3);
+            currentQuestions = getGameQuestions(pool);
+
+            document.getElementById('hud').classList.remove('hidden');
+            const qBox = document.getElementById('question-display');
+            qBox.classList.remove('hidden');
+            if (gameMode === 3) { qBox.classList.remove('pos-top'); qBox.classList.add('pos-mid'); }
+            else { qBox.classList.add('pos-top'); qBox.classList.remove('pos-mid'); }
+
+            const hBox = document.getElementById('hints-container');
+            if (gameMode === 1) { hBox.classList.remove('hidden'); resetHints(); }
+            else hBox.classList.add('hidden');
+            
+            playRandomMusic();
+            score = 0; lives = 2; currentQuestionIndex = 0;
+            items = []; bullets = []; particles = [];
+            gameActive = true; isPausedForExplanation = false;
+            resize(); updateHUD(); loadQuestion();
+        }
+
+        function loadQuestion() {
+            if (currentQuestionIndex >= currentQuestions.length) { endLevel(); return; }
+            const q = currentQuestions[currentQuestionIndex];
+            document.getElementById('question-text').innerHTML = q.text.replace('_____', '<span class="highlight">_____</span>');
+            document.getElementById('translation-text').classList.add('hidden');
+
+            items = []; bullets = [];
+            if (gameMode === 1) spawnWaveL1(q);
+            if (gameMode === 2) spawnTargetsL2(q);
+            if (gameMode === 3) spawnAsteroidsL3(q);
+        }
+
+        // --- SPAWNERS ---
+        function spawnWaveL1(q) {
+            const cols = [canvas.width*0.2, canvas.width*0.5, canvas.width*0.8].sort(()=>Math.random()-0.5);
+            items.push(createItem(cols[0], q.correct, true));
+            items.push(createItem(cols[1], q.wrongs[0], false));
+            items.push(createItem(cols[2], q.wrongs[1], false));
+        }
+        function createItem(x, text, isCorrect) {
+            return { x, y: -60, text, isCorrect, radius: 40, speed: (1.5+Math.random()*0.5)/2.5, color: BALL_COLORS[Math.floor(Math.random()*7)], active: true };
+        }
+        function spawnTargetsL2(q) {
+            const arr = [q.correct, q.wrongs[0], q.wrongs[1]]; 
+            arr.forEach(t => items.push({ x: Math.random()*(canvas.width-100)+50, y: Math.random()*(canvas.height*0.4)+100, vx:(Math.random()-0.5)*3, vy:(Math.random()-0.5)*3, text:t, isCorrect:t===q.correct, radius:45, color: t===q.correct?'#10b981':'#ef4444' }));
+        }
+        function spawnAsteroidsL3(q) {
+            const pos = [canvas.width*0.25, canvas.width*0.5, canvas.width*0.75].sort(()=>Math.random()-0.5);
+            items.push({ x: pos[0], y: canvas.height-50, text: q.correct, isCorrect: true, radius: 40, color:'#475569', angle:0, beingBeamed: false });
+            items.push({ x: pos[1], y: canvas.height-50, text: q.wrongs[0], isCorrect: false, radius: 40, color:'#475569', angle:0, beingBeamed: false });
+            items.push({ x: pos[2], y: canvas.height-50, text: q.wrongs[1], isCorrect: false, radius: 40, color:'#475569', angle:0, beingBeamed: false });
+        }
+        function shootBullet() {
+            const a = Math.atan2(mouseY - player.y, mouseX - player.x);
+            bullets.push({ x: player.x, y: player.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5 });
+        }
+
+        // --- EXPLANATIONS ---
+        function getExplanationText(q, wrongText) {
+            let correct = q.correct;
+            // Правило 1: окончания s/es
+            if (correct === "likes" || correct === "goes" || correct === "plays" || correct === "lives" || correct === "flies" || correct === "does" || correct === "eats" || correct === "works" || correct === "speaks" || correct === "rises" || correct === "watches" || correct === "runs" || correct === "reads" || correct === "sings" || correct === "drives" || correct === "drinks" || correct === "snows" || correct === "cooks" || correct === "brushes" || correct === "looks" || correct === "is") {
+                if(correct === "is") return `Для <b>he, she, it</b> глагол "to be" имеет форму <span class="text-yellow-400 font-bold">is</span>!`;
+                return `Подлежащее в ед. числе (He/She/It/Существительное), значит к глаголу нужно добавить <span class="text-yellow-400 font-bold">-s</span> или <span class="text-yellow-400 font-bold">-es</span>! Правильно: <b>${correct}</b>.`;
+            }
+            // Правило 2: I, you, we, they без окончания
+            if (["go","play","love","live","fly","do","eat","work","speak","watch","run","read","sing","drive","drink","snow","cook","wake up","brush","look","are"].includes(correct)) {
+                if(correct === "are") return `Для <b>we, you, they</b> глагол "to be" имеет форму <span class="text-green-400 font-bold">are</span>!`;
+                return `Для <b>I, You, We, They</b> глагол используется <span class="text-green-400 font-bold">БЕЗ окончаний</span>! Правильно: <b>${correct}</b>.`;
+            }
+            // Правило 3: doesn't / Does
+            if (correct === "doesn't" || correct === "Does") {
+                return `С местоимениями <b>He, She, It</b> в отрицании и вопросах используем <span class="text-yellow-400 font-bold">${correct}</span> (вспомогательный глагол забирает "s" себе)!`;
+            }
+            // Правило 4: don't / Do
+            if (correct === "don't" || correct === "Do") {
+                 return `С местоимениями <b>I, You, We, They</b> используем вспомогательный глагол <span class="text-green-400 font-bold">${correct}</span>!`;
+            }
+            return `Запомни, в этом предложении правильно использовать: <span class="text-green-400 font-bold">${correct}</span>.`;
+        }
+
+        function triggerError(q, wrongObj) {
+            playSound('wrong'); lives--; updateHUD();
+            createParticles(wrongObj.x, wrongObj.y, '#ef4444');
+            
+            // Generate dynamic text
+            let sentence = q.text.replace('_____', `<span class="text-red-400 line-through">${wrongObj.text}</span> <span class="text-green-400 font-bold">${q.correct}</span>`);
+            let explanation = getExplanationText(q, wrongObj.text);
+
+            document.getElementById('exp-wrong-text').innerHTML = `В предложении:<br><i>"${sentence}"</i>`;
+            document.getElementById('exp-theory-text').innerHTML = explanation;
+
+            isPausedForExplanation = true;
+            document.getElementById('explanation-modal').classList.remove('hidden');
+
+            // Remove the object so it doesn't trigger again
+            if(gameMode===1) wrongObj.active = false;
+            else {
+                let idx = items.indexOf(wrongObj);
+                if(idx > -1) items.splice(idx, 1);
+            }
+        }
+
+        function closeExplanation() {
+            document.getElementById('explanation-modal').classList.add('hidden');
+            if(lives <= 0) { endLevel(); return; }
+            isPausedForExplanation = false;
+        }
+
+        // --- END LEVEL / REPORTING ---
+        function endLevel() {
+            gameActive = false; isBeaming = false;
+            if (currentMusic) currentMusic.pause();
+            
+            levelScores[gameMode] = score; levelMax[gameMode] = currentQuestions.length;
+            levelsCompleted[gameMode] = true;
+
+            const card = document.getElementById(`card-${gameMode}`);
+            card.classList.add('played');
+            document.getElementById(`score-l${gameMode}`).innerText = `Score: ${score}/${currentQuestions.length}`;
+
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('question-display').classList.add('hidden');
+            document.getElementById('hints-container').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.remove('hidden');
+            document.getElementById('level-score').innerText = `${score} / ${currentQuestions.length}`;
+            
+            const nextBtn = document.getElementById('btn-next-level');
+            if (gameMode < 3) nextBtn.classList.remove('hidden');
+            else nextBtn.classList.add('hidden'); 
+
+            // Разблокируем следующий уровень при завершении текущего
+            if (gameMode === highestUnlocked && highestUnlocked < 3) {
+                highestUnlocked++;
+                updateLevelLocks();
+            }
+
+            checkMissionStatus();
+        }
+
+        function checkMissionStatus() {
+            const playedCount = Object.values(levelsCompleted).filter(Boolean).length;
+            const percent = Math.round((playedCount / 3) * 100);
+            document.getElementById('total-progress').classList.remove('hidden');
+            document.getElementById('progress-percent').innerText = `${percent}%`;
+            if (playedCount === 3) document.getElementById('btn-final-report').classList.remove('hidden');
+        }
+
+        function showFinalReport() {
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('final-report-screen').classList.remove('hidden');
+
+            const totalScore = levelScores[1] + levelScores[2] + levelScores[3];
+            const maxScore = levelMax[1] + levelMax[2] + levelMax[3]; 
+            
+            document.getElementById('total-score-display').innerText = `${totalScore} / ${maxScore}`;
+            document.getElementById('report-l1').innerText = `${levelScores[1]}/${levelMax[1]}`;
+            document.getElementById('report-l2').innerText = `${levelScores[2]}/${levelMax[2]}`;
+            document.getElementById('report-l3').innerText = `${levelScores[3]}/${levelMax[3]}`;
+
+            const p = (totalScore / maxScore) * 100;
+            currentGrade = 2; let color = '#ef4444';
+            if (p >= 85) { currentGrade = 5; color = '#22c55e'; }
+            else if (p >= 70) { currentGrade = 4; color = '#eab308'; }
+            else if (p >= 50) { currentGrade = 3; color = '#f97316'; }
+
+            const badge = document.getElementById('final-grade-badge');
+            badge.innerText = `Оценка: ${currentGrade}`;
+            badge.style.color = color;
+
+            const secretBtn = document.getElementById('btn-secret');
+            const secretDisplay = document.getElementById('secret-word-display');
+            secretDisplay.classList.add('hidden'); // Reset
+            if (currentGrade === 5) secretBtn.classList.remove('hidden');
+            else secretBtn.classList.add('hidden');
+        }
+
+        function showSecret() {
+            document.getElementById('btn-secret').classList.add('hidden');
+            const display = document.getElementById('secret-word-display');
+            display.innerText = "Секретное слово: Space - Космос";
+            display.classList.remove('hidden');
+        }
+
+        function resetGame() {
+            levelScores = { 1: 0, 2: 0, 3: 0 }; levelsCompleted = { 1: false, 2: false, 3: false };
+            for(let i=1; i<=3; i++) {
+                document.getElementById(`card-${i}`).classList.remove('played');
+                document.getElementById(`score-l${i}`).innerText = 'Score: -/-';
+            }
+            highestUnlocked = 1; // Сбрасываем прогресс до 1 уровня
+            updateLevelLocks();
+
+            document.getElementById('btn-final-report').classList.add('hidden');
+            document.getElementById('total-progress').classList.add('hidden');
+            document.getElementById('secret-word-display').classList.add('hidden');
+            returnToMenu();
+        }
+
+        function returnToMenu() {
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('final-report-screen').classList.add('hidden');
+            document.getElementById('main-menu').classList.remove('hidden');
+        }
+
+        // --- HINTS & UI ---
+        function activateFreeze() {
+            if(isFrozen) return;
+            isFrozen = true; document.getElementById('btn-freeze').disabled = true;
+            setTimeout(() => isFrozen = false, 5000);
+        }
+        function activateTranslation() {
+            const q = currentQuestions[currentQuestionIndex];
+            const t = document.getElementById('translation-text');
+            t.innerText = q.trans; t.classList.remove('hidden');
+            document.getElementById('btn-translate').disabled = true;
+        }
+        function resetHints() {
+            document.getElementById('btn-freeze').disabled = false;
+            document.getElementById('btn-translate').disabled = false;
+            isFrozen = false;
+        }
+        function updateHUD() {
+            document.getElementById('score').innerText = score;
+            document.getElementById('lives').innerHTML = '❤️'.repeat(lives>0?lives:0);
+        }
+        function toggleGradingCriteria(s) {
+            const m = document.getElementById('grading-modal');
+            if(s) m.classList.remove('hidden'); else m.classList.add('hidden');
+        }
+        function closeGradingCriteria() { toggleGradingCriteria(false); }
+
+        function createParticles(x, y, color) {
+            for(let i=0; i<15; i++) particles.push({ x, y, vx:(Math.random()-0.5)*12, vy:(Math.random()-0.5)*12, life:1, color });
+        }
+
+        // --- MAIN LOOP ---
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // BG Stars (Always active)
+            ctx.fillStyle = "white";
+            stars.forEach(s => {
+                s.y += s.speed;
+                if (s.y > canvas.height) s.y = 0;
+                ctx.globalAlpha = Math.random()*0.5+0.3;
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI*2); ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+
+            if (gameActive) {
+                // L1 Logic
+                if (gameMode === 1) {
+                    ctx.fillStyle = "#a855f7";
+                    ctx.beginPath(); ctx.moveTo(player.x+30, player.y); ctx.lineTo(player.x+60, player.y+60); ctx.lineTo(player.x+30, player.y+50); ctx.lineTo(player.x, player.y+60); ctx.fill();
+                    
+                    let activeCount = 0;
+                    items.forEach(i => {
+                        if(i.active) {
+                            if(!isFrozen && !isPausedForExplanation) i.y += i.speed;
+                            ctx.beginPath(); ctx.arc(i.x, i.y, i.radius, 0, Math.PI*2); ctx.fillStyle=i.color; ctx.fill();
+                            ctx.strokeStyle="white"; ctx.lineWidth=2; ctx.stroke();
+                            ctx.fillStyle="white"; ctx.font="bold 16px Roboto"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(i.text, i.x, i.y);
+                            if(isFrozen) { ctx.fillStyle="rgba(147, 197, 253, 0.3)"; ctx.fill(); }
+
+                            if(!isPausedForExplanation) {
+                                let d = Math.sqrt((i.x-(player.x+30))**2 + (i.y-(player.y+30))**2);
+                                if(d < i.radius+30) {
+                                    if(i.isCorrect) { i.active = false; playSound('right'); score++; createParticles(i.x, i.y, '#22c55e'); currentQuestionIndex++; updateHUD(); setTimeout(loadQuestion, 500); items=[]; }
+                                    else { triggerError(currentQuestions[currentQuestionIndex], i); }
+                                }
+                            }
+                            if(i.y > canvas.height+60) i.active=false; else activeCount++;
+                        }
+                    });
+                    if(items.length>0 && activeCount===0 && !isPausedForExplanation) items.forEach(i=>{i.y=-60; i.active=true;});
+                }
+
+                // L2 Logic
+                if (gameMode === 2) {
+                    ctx.save(); ctx.translate(player.x, player.y);
+                    let a = Math.atan2(mouseY-player.y, mouseX-player.x);
+                    ctx.rotate(a+Math.PI/2);
+                    ctx.fillStyle="#3b82f6"; ctx.fillRect(-20, -20, 40, 60);
+                    ctx.fillStyle="#60a5fa"; ctx.fillRect(-5, -40, 10, 40);
+                    ctx.restore();
+
+                    if(!isPausedForExplanation) {
+                        for(let i=bullets.length-1; i>=0; i--) {
+                            let b = bullets[i]; b.x+=b.vx; b.y+=b.vy;
+                            ctx.fillStyle="#facc15"; ctx.beginPath(); ctx.arc(b.x, b.y, 10, 0, Math.PI*2); ctx.fill();
+                            if(b.x<0||b.x>canvas.width||b.y<0||b.y>canvas.height) bullets.splice(i,1);
+                        }
+                    }
+
+                    for(let i=items.length-1; i>=0; i--) {
+                        let t = items[i]; 
+                        if(!isPausedForExplanation) {
+                            t.x+=t.vx; t.y+=t.vy;
+                            if(t.x<t.radius||t.x>canvas.width-t.radius) t.vx*=-1;
+                            if(t.y<t.radius||t.y>canvas.height*0.6) t.vy*=-1;
+                        }
+                        
+                        ctx.beginPath(); ctx.arc(t.x, t.y, t.radius, 0, Math.PI*2); ctx.fillStyle="#475569"; ctx.fill();
+                        ctx.strokeStyle="#94a3b8"; ctx.lineWidth=3; ctx.stroke();
+                        ctx.fillStyle="white"; ctx.font="bold 16px Roboto"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(t.text, t.x, t.y);
+
+                        if(!isPausedForExplanation) {
+                            for(let j=bullets.length-1; j>=0; j--) {
+                                let b = bullets[j];
+                                if(Math.sqrt((t.x-b.x)**2+(t.y-b.y)**2) < t.radius) {
+                                    bullets.splice(j,1);
+                                    if(t.isCorrect) { playSound('right'); score++; createParticles(t.x, t.y, '#22c55e'); currentQuestionIndex++; updateHUD(); setTimeout(loadQuestion, 500); items=[]; }
+                                    else { triggerError(currentQuestions[currentQuestionIndex], t); }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // L3 Logic
+                if (gameMode === 3) {
+                    if (isBeaming && !isPausedForExplanation) {
+                        ctx.save();
+                        let g = ctx.createLinearGradient(0, player.y+20, 0, canvas.height); g.addColorStop(0,"rgba(56, 189, 248, 0.4)"); g.addColorStop(1,"rgba(56, 189, 248, 0)");
+                        ctx.fillStyle=g; ctx.fillRect(player.x-35, player.y+20, 70, canvas.height-player.y);
+                        ctx.strokeStyle=`rgba(125, 211, 252, ${Math.random()*0.4+0.1})`; ctx.lineWidth=2;
+                        ctx.beginPath(); ctx.moveTo(player.x-35, player.y+20); ctx.lineTo(player.x-45, canvas.height);
+                        ctx.moveTo(player.x+35, player.y+20); ctx.lineTo(player.x+45, canvas.height); ctx.stroke();
+                        ctx.restore();
+                    }
+                    ctx.save(); ctx.translate(player.x, player.y);
+                    ctx.fillStyle="#8b5cf6"; ctx.beginPath(); ctx.arc(0, 0, 20, Math.PI, 0); ctx.fill();
+                    ctx.fillStyle="#94a3b8"; ctx.beginPath(); ctx.ellipse(0, 10, 50, 15, 0, 0, Math.PI*2); ctx.fill();
+                    let pt = Date.now()/200;
+                    for(let i=0; i<5; i++) { ctx.fillStyle=(Math.floor(pt)%5===i)?"#4ade80":"#334155"; ctx.beginPath(); ctx.arc(-35+i*17.5, 10, 4, 0, Math.PI*2); ctx.fill(); }
+                    ctx.restore();
+
+                    for(let i=items.length-1; i>=0; i--) {
+                        let w = items[i];
+                        if(!isPausedForExplanation) {
+                            if(isBeaming && Math.abs(player.x-w.x)<50) {
+                                w.y-=2.5; w.x+=(player.x-w.x)*0.05; w.beingBeamed=true; w.x+=Math.sin(Date.now()/50);
+                                if(w.y < player.y+40) {
+                                    if(w.isCorrect) { items.splice(i,1); playSound('right'); score++; createParticles(player.x, player.y, '#22c55e'); currentQuestionIndex++; updateHUD(); setTimeout(loadQuestion, 500); items=[]; }
+                                    else { triggerError(currentQuestions[currentQuestionIndex], w); }
+                                }
+                            } else {
+                                if(w.y < canvas.height-50) w.y+=4; else w.y=canvas.height-50;
+                                w.beingBeamed=false;
+                            }
+                        }
+                        ctx.save(); ctx.translate(w.x, w.y);
+                        ctx.fillStyle=w.color; ctx.beginPath(); ctx.arc(0,0,w.radius,0,Math.PI*2); ctx.fill();
+                        ctx.strokeStyle="#cbd5e1"; ctx.lineWidth=2; ctx.stroke();
+                        ctx.fillStyle="white"; ctx.font="bold 18px Roboto"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(w.text,0,0);
+                        ctx.restore();
+                    }
+                }
+
+                // Particles
+                if(!isPausedForExplanation) {
+                    for(let i=particles.length-1; i>=0; i--) {
+                        let p=particles[i]; p.x+=p.vx; p.y+=p.vy; p.life-=0.05;
+                        ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
+                        if(p.life<=0) particles.splice(i,1);
+                    }
+                } else { // Still draw frozen particles
+                    for(let i=particles.length-1; i>=0; i--) {
+                        let p=particles[i]; ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
+                    }
+                }
+                ctx.globalAlpha=1;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
