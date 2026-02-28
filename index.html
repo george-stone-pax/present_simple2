@@ -4,30 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grammar Galaxy Defender 7.0</title>
-    <!-- Скрипт защиты с исключением для localhost и локальных файлов -->
-    <script>
-        (function() {
-            const allowedDomains = ['stepik.org', 'welcome.stepik.org'];
-            const referrer = document.referrer;
-            const hostname = window.location.hostname;
-            
-            // Проверка на локальный запуск (localhost, 127.0.0.1 или запуск файла напрямую)
-            const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '' || window.location.protocol === 'file:';
-            const isInsideStepik = allowedDomains.some(domain => referrer.includes(domain));
-
-            if (!isInsideStepik && !isLocal) {
-                document.documentElement.innerHTML = `
-                    <div style="background:#020617; color:#fff; height:100vh; display:flex;
-                                flex-direction:column; align-items:center; justify-content:center;
-                                font-family:sans-serif; text-align:center; padding:20px; margin:0;">
-                        <h1 style="color:#ef4444; font-size: 2.5rem; margin-bottom: 20px;">⛔️ Доступ ограничен</h1>
-                        <p style="font-size: 1.2rem; margin-bottom: 30px;">Эта игра — часть курса. <br>
-                        Пожалуйста, вернитесь к обучению на Stepik.</p>
-                        <a href="https://stepik.org" style="color:#000; background:#4ade80; padding: 15px 30px; text-decoration:none; border-radius:30px; font-weight:bold; font-size:1.1rem;">Перейти к курсу</a>
-                    </div>`;
-                window.stop();
-            }
-        })();
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -1018,4 +994,5 @@
         }
     </script>
 </body>
+
 </html>
